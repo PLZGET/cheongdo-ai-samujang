@@ -1,0 +1,18 @@
+.venv/
+node_modules/
+__pycache__/
+*.pyc
+.pytest_cache/
+dist/
+web/dist/
+backend/static/
+.env
+.env.*
+*.log
+.playwright-mcp/
+.copilot/
+data/local/
+
+# 내부 작업 자료(공개 저장소 제외)
+docs/HACKATHON_STRATEGY.md
+docs/음성*.txt
