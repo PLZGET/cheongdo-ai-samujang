@@ -40,9 +40,12 @@ $acr = $outputs.acrName.value
 $image = "$($outputs.acrLoginServer.value)/samujang:$sha"
 # 이 구독은 ACR Tasks(원격 빌드)를 허용하지 않아 로컬 Docker로 빌드·푸시한다.
 az acr login -n $acr --only-show-errors
-docker build --platform linux/amd64 --build-arg APP_VERSION=$sha -t $image .
+# docker는 진행 로그를 stderr로 쓰므로 종료 코드로만 실패를 판단한다.
+$ErrorActionPreference = "Continue"
+docker build --platform linux/amd64 --build-arg APP_VERSION=$sha -t $image . 2>&1 | Select-Object -Last 5
 if ($LASTEXITCODE -ne 0) { throw "docker build 실패" }
-docker push $image
+docker push $image 2>&1 | Select-Object -Last 2
 if ($LASTEXITCODE -ne 0) { throw "docker push 실패" }
+$ErrorActionPreference = "Stop"
 $outputs = Invoke-Infra $image $sha
 Write-Host "배포 완료: $($outputs.appUrl.value) (버전 $sha)"
