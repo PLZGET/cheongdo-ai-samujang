@@ -74,7 +74,15 @@ export default function App() {
               ["evaluation", "정답 대조"],
             ] as [Tab, string][]
           ).map(([id, label]) => (
-            <button key={id} className={tab === id ? "tab active" : "tab"} aria-current={tab === id ? "page" : undefined} onClick={() => setTab(id)}>
+            <button
+              key={id}
+              className={tab === id ? "tab active" : "tab"}
+              aria-current={tab === id ? "page" : undefined}
+              onClick={() => {
+                setTab(id);
+                if (id === "ledger") reload();
+              }}
+            >
               {label}
             </button>
           ))}
@@ -84,7 +92,9 @@ export default function App() {
         </button>
       </header>
       <main className="page">
-        {tab === "morning" && <Morning ws={ws} onCommitted={reload} />}
+        <div hidden={tab !== "morning"}>
+          <Morning ws={ws} onCommitted={reload} />
+        </div>
         {tab === "ledger" && <Ledger ws={ws} onRefresh={reload} />}
         {tab === "evaluation" && <EvaluationView wsid={ws.wsid} />}
       </main>

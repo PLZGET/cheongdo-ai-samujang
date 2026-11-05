@@ -558,7 +558,11 @@ class Review(Executor):
         blocks = []
         for customer in sorted({m["sender"] for m in job["messages"]}):
             mine = [l for l in plan["lines"] if l["customer"] == customer]
-            result = "; ".join(f"{l['recipient']} {l['product_name']} {l['qty']}박스 주소={l['address_raw'] or '없음'}" for l in mine) or "주문 없음"
+            result = "; ".join(
+                f"{l['recipient']} {l['product_name']} {l['qty']}박스 주소={l['address_raw'] or '없음'}"
+                + (" [작년 주문 기록 조회 기반, 사장님 확인 예정]" if l["from_last_year"] else "")
+                for l in mine
+            ) or "주문 없음"
             cancels = ", ".join(f"{c['product']} 취소" for c in plan["cancellations"] if c["customer"] == customer)
             blocks.append(f"## {customer}\n원문:\n{message_block(job, customer)}\n정리 결과: {result}{(' / ' + cancels) if cancels else ''}")
         try:

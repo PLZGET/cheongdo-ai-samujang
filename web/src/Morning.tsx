@@ -13,7 +13,7 @@ import {
   ShieldAlert,
   XCircle,
 } from "lucide-react";
-import { api, Line, Plan, Question, Run, RunEvent, TERMINAL, won, Workspace } from "./api";
+import { api, ApiError, Line, Plan, Question, Run, RunEvent, TERMINAL, won, Workspace } from "./api";
 
 const STEPS: { id: string; label: string; kind: "ai" | "code" | "human" }[] = [
   { id: "prepare", label: "입력 정리·가명화", kind: "code" },
@@ -73,16 +73,19 @@ export default function Morning({ ws, onCommitted }: { ws: Workspace; onCommitte
     };
   };
 
+  const attachLatest = async (onlyActive: boolean) => {
+    const fresh = await api.workspace(ws.wsid);
+    const latest = fresh.runs.find((r) => r.type === "morning" && (!onlyActive || !TERMINAL.has(r.status)));
+    if (!latest) return false;
+    const r = await api.run(ws.wsid, latest.run_id);
+    setRun(r);
+    if (!TERMINAL.has(r.status)) subscribe(r.run_id);
+    return true;
+  };
+
   useEffect(() => {
-    const latest = ws.runs.find((r) => r.type === "morning");
-    if (latest) {
-      api.run(ws.wsid, latest.run_id).then((r) => {
-        setRun(r);
-        if (!TERMINAL.has(r.status)) subscribe(r.run_id);
-      });
-    } else {
-      setRun(null);
-    }
+    setRun(null);
+    attachLatest(false).catch(() => undefined);
     setInbox(ws.state.samples.inbox);
     setDeposits(ws.state.samples.deposits);
     return () => source.current?.close();
@@ -97,6 +100,8 @@ export default function Morning({ ws, onCommitted }: { ws: Workspace; onCommitte
       setRun(r);
       subscribe(r.run_id);
     } catch (e) {
+      // 이미 진행 중인 실행이 있으면 새로 만들지 않고 그 실행에 다시 연결한다.
+      if (e instanceof ApiError && e.status === 409 && (await attachLatest(true).catch(() => false))) return;
       setError((e as Error).message);
     } finally {
       setStarting(false);

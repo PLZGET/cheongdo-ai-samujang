@@ -89,6 +89,12 @@ export type Workspace = {
   runs: { run_id: string; type: string; status: string; created_at: number }[];
 };
 
+export class ApiError extends Error {
+  constructor(message: string, public status: number) {
+    super(message);
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...init });
   if (!res.ok) {
@@ -99,7 +105,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       /* 본문 없음 */
     }
-    throw new Error(message);
+    throw new ApiError(message, res.status);
   }
   return res.json() as Promise<T>;
 }
