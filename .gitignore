@@ -16,3 +16,6 @@ data/local/
 # 내부 작업 자료(공개 저장소 제외)
 docs/HACKATHON_STRATEGY.md
 docs/음성*.txt
+
+# 로컬 Copilot 스킬(외부 자료)
+.github/skills/
