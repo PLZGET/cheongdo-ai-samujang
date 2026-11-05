@@ -26,6 +26,7 @@ from .runs import RunBusy, RunManager
 from .store import build_store, new_id
 
 logging.basicConfig(level=logging.INFO)
+logging.getLogger("azure").setLevel(logging.WARNING)
 log = logging.getLogger("samujang")
 
 APP_VERSION = os.environ.get("APP_VERSION", "dev")
