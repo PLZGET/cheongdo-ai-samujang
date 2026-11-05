@@ -43,18 +43,18 @@ flowchart LR
 
 | 기능 | 구현 | 상태 |
 |---|---|---|
-| 모델 연결 | 앱 시작 시 `CopilotClient` 1개를 띄우고 모든 에이전트가 공유한다(`CopilotRuntime`). Azure에서는 Key Vault에 저장된 GitHub 토큰을 `github_token`으로 넘기고 `use_logged_in_user=False`로 둔다 | 🟡 |
+| 모델 연결 | 앱 시작 시 `CopilotClient` 1개를 띄우고 모든 에이전트가 공유한다(`CopilotRuntime`). Azure에서는 Key Vault에 저장된 GitHub 토큰을 `github_token`으로 넘기고 `use_logged_in_user=False`로 둔다 | ✅ |
 | 에이전트 정의 | 역할별 `GitHubCopilotAgent`: 접수·정산·배송·검토·고객응대·클레임·장부 조회. 역할마다 지침(`INSTRUCTIONS`)과 도구 집합(`TOOLS`)이 다르다 | ✅ |
 | 도구 호출 | 읽기 전용 함수 도구(`get_catalog`, `get_customer_profile`, `get_customer_ledger`, `get_ledger_summary`). 작업공간 데이터는 `FunctionInvocationContext.kwargs`로 주입해 모델 입력 스키마에 노출하지 않는다 | ✅ |
 | 권한 경계 | 세션마다 `available_tools`를 역할 도구로 제한하고, `on_permission_request`가 등록된 사용자 정의 도구만 승인한다. 셸·파일·URL 등 런타임 내장 권한은 모두 거부한다 | ✅ |
 | 구조화 출력 | 역할별 Pydantic 스키마로 검증하고, 형식이 틀리면 오류 내용을 붙여 1회 재요청한다(`run_structured`) | ✅ |
 | 오케스트레이션 | `WorkflowBuilder` 그래프(아래 3절). 병렬 fan-out/fan-in, 조건 분기, 재작업 루프, 사람 확인 2회 | ✅ |
 | 사람 확인(HITL) | `ctx.request_info` → 실행 중단 → 체크포인트 저장 → `/respond` 요청 시 `workflow.run(checkpoint_id=…, responses=…)`로 재개 | ✅ |
-| 체크포인트 | `StoreCheckpointStorage`가 MAF 체크포인트를 Cosmos DB 작업공간 파티션에 저장한다. 앱 재시작 뒤에도 대기 중인 실행을 재개할 수 있다 | 🟡 |
+| 체크포인트 | `StoreCheckpointStorage`가 MAF 체크포인트를 Cosmos DB 작업공간 파티션에 저장한다. 응답이 오면 메모리의 워크플로 객체가 아니라 저장된 체크포인트에서 새 워크플로를 복원해 재개한다 | ✅ (앱 재시작 후 재개는 미검증) |
 | 스트리밍 | 워크플로 이벤트 스트림과 실행 단계별 진행 이벤트를 SSE로 브라우저에 실시간 전달한다 | ✅ |
 | 컨텍스트 | 고객별 메시지 묶음과 시간순 정정 이력, 작년 주문·가족 관계 조회, 검토 지적을 다음 재해석 프롬프트에 포함 | ✅ |
 | 이미지 입력 | MAF `Content.from_uri(data:image/...)` → Copilot SDK blob 첨부로 사진 판독. 스파이크로 확인했고 앱 기능은 미구현 | ⏳ |
-| 관찰성 | `enable_instrumentation(enable_sensitive_data=False)` + Azure Monitor OpenTelemetry. 프롬프트·응답 본문은 추적에 남기지 않는다 | 🟡 |
+| 관찰성 | `enable_instrumentation(enable_sensitive_data=False)` + Azure Monitor OpenTelemetry. 프롬프트·응답 본문은 추적에 남기지 않는다 | 🟡 (컨테이너 로그에서 Application Insights 전송 성공 확인, 포털의 추적 화면은 미확인) |
 
 검증 근거: `spikes/spike_maf_copilot.py`(실제 모델 응답, 도구 호출, 스트리밍, 병렬 실행, HITL 재개, 이미지 판독), `scripts/smoke_api.py`(API 전체 흐름).
 
@@ -176,8 +176,8 @@ python scripts/smoke_api.py <배포 URL>   # API 전체 흐름 점검
 |---|---|---|
 | 계획 엔진 정답 일치 | `pytest backend/tests` | 2건 통과 |
 | SDK + MAF 기능 | `spikes/spike_maf_copilot.py` 로컬 실행 | 실제 응답, 도구 호출, 스트리밍, 병렬 시작, HITL 재개, 이미지 판독(16개 중 2개 파손) 확인 |
-| API 전체 흐름(로컬) | `scripts/smoke_api.py` | 완료까지 160초, 중복 승인 1회만 반영, 정답 대조 주문 9/11 → 지침 수정 후 재측정 예정 |
-| Azure 배포 | 배포 URL에서 `smoke_api.py` | 진행 중 |
+| API 전체 흐름(로컬) | `scripts/smoke_api.py` | 완료까지 160초, 중복 승인 1회만 반영, 정답 대조 주문 9/11 → 접수 지침 수정 |
+| Azure 배포 전체 흐름 | 배포 URL에서 `smoke_api.py` (Cosmos DB, Key Vault 토큰, 체크포인트 재개 포함) | 확정까지 172초. 확인 질문 4건(작년 주문, 가족 입금, 금요일 발송, 초과 입금). 정답 대조 주문 9/11 — 검토 에이전트가 작년 기록 기반 제안을 오판해 보류된 1건과 그 연쇄 1건. 검토 입력·지침을 수정했고 재측정 예정 |
 
 ## 11. 설계 결정
 
