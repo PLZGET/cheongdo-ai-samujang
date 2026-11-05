@@ -279,6 +279,7 @@ def compute_plan(job: dict, intake: dict, finance: dict, shipping: dict, answers
             shortages_alt.append({"product": code, "product_name": catalog[code]["name"], "qty": qty, "alternatives": alts})
 
     return {
+        "messages": [{"id": m["id"], "at": m["at"], "sender": m["sender"], "text": m["text_masked"]} for m in job["messages"]],
         "lines": lines,
         "cancellations": cancellations,
         "flags": flags,

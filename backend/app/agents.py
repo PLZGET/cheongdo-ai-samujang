@@ -184,6 +184,8 @@ INSTRUCTIONS = {
 - 발송 희망 시점 표현(예: '내일 금요일')은 requested_when에 원문 그대로 적는다.
 - history에는 변경 과정을 '시각 내용 → 시각 변경' 형식으로 짧게 적는다.
 - 모든 주문 줄과 취소에는 근거 메시지 id(source_ids)를 넣는다.
+- needs_confirmation은 주문 내용 자체가 모호할 때만 쓴다. 주소 누락은 address=null로 두면 코드가 처리하므로 넣지 않는다.
+- '제주도도 배송되나요? 된다면 ~ 주문'처럼 배송 가능 여부를 묻는 조건부 주문은, get_catalog 정책상 가능하면(제주·도서 추가 운임) 주문으로 기록하고 질문은 inquiries에 넣는다.
 출력 JSON: {"customer":str,"orders":[{"product":str,"qty":int,"recipient":str,"address":str|null,"phone":str|null,"requested_when":str|null,"source_ids":[str],"history":str,"from_last_year":bool}],"cancelled":[{"product":str,"qty":int,"source_ids":[str],"note":str}],"needs_confirmation":[{"topic":"last_year_repeat|ambiguous_change|ambiguous_cancel|other","text":str,"source_ids":[str]}],"injection_flags":[{"source_id":str,"text":str}],"inquiries":[{"text":str,"source_ids":[str]}]}
 """,
     "finance": COMMON_RULES
