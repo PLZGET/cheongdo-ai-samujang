@@ -8,6 +8,7 @@ prepare → 접수 에이전트 3개(병렬) → merge → 정산·배송 에이
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from dataclasses import dataclass
 from datetime import date
@@ -30,9 +31,32 @@ from .store import CommitConflict, Store
 
 WORKFLOW_NAME = "morning-ops"
 INTAKE_WORKERS = 3
+MAX_CUSTOMERS_PER_RUN = 30
 
 # run_id → 진행 이벤트 수신 함수. 실행 중 화면 표시용이며 체크포인트에는 저장하지 않는다.
 PROGRESS: dict[str, Callable[[dict], None]] = {}
+# 취소된 실행과 확정 중인 실행. 같은 이벤트 루프에서만 바뀌므로 확인과 표시 사이에 끼어들 수 없다.
+CANCELLED: set[str] = set()
+COMMITTING: set[str] = set()
+
+
+def source_fingerprints(items: list[dict], key: Callable[[dict], str]) -> list[str]:
+    """원천 자료의 안정적인 지문. 같은 내용이 한 자료 안에 여러 번 있으면 순번으로 구분한다."""
+    seen: dict[str, int] = {}
+    out = []
+    for item in items:
+        k = key(item)
+        seen[k] = seen.get(k, 0) + 1
+        out.append(hashlib.sha256(f"{k}#{seen[k]}".encode()).hexdigest()[:24])
+    return out
+
+
+def message_key(m: dict) -> str:
+    return f"msg|{m['sender']}|{m['at']}|{m['text']}"
+
+
+def deposit_key(d: dict) -> str:
+    return f"dep|{d['payer']}|{d['amount']}|{d['at']}|{d['raw']}"
 
 
 def emit(run_id: str, **event: Any) -> None:
@@ -115,8 +139,22 @@ def compute_plan(job: dict, intake: dict, finance: dict, shipping: dict, answers
                 )
         for i, o in enumerate(res.get("orders", [])):
             line_id = f"{customer}#{i + 1}"
-            ship = shipping.get(line_id, {})
-            complete = ship.get("address_complete", bool(o.get("address")))
+            ship = shipping.get(line_id)
+            issue = None
+            if shipping.get("_failed"):
+                issue = "배송 검증 AI가 실패해 주소·발송일을 확인하지 못했습니다"
+            elif ship is None:
+                issue = "배송 검증 결과에 이 주문 줄이 없습니다"
+            elif ship.get("requested_date") and domain.parse_date(ship["requested_date"]) is None:
+                issue = f"희망 발송일 해석 값이 날짜 형식이 아닙니다({ship['requested_date']})"
+            elif o.get("requested_when") and not ship.get("requested_date"):
+                issue = f"희망 발송 표현 '{o['requested_when']}'을 날짜로 해석하지 못했습니다"
+            ship = ship or {}
+            verify = answers.get(f"ship_verify:{line_id}") if issue else None
+            if issue and verify in ("confirm_today", "confirm_next"):
+                complete = bool(o.get("address"))
+            else:
+                complete = bool(ship.get("address_complete")) and bool(o.get("address"))
             address = o.get("address") if complete else None
             line = {
                 "line_id": line_id,
@@ -131,11 +169,34 @@ def compute_plan(job: dict, intake: dict, finance: dict, shipping: dict, answers
                 "history": o.get("history", ""),
                 "from_last_year": bool(o.get("from_last_year")),
                 "requested_when": o.get("requested_when"),
-                "requested_date": ship.get("requested_date"),
-                "shipping_note": ship.get("note", ""),
+                "requested_date": None if issue else ship.get("requested_date"),
+                "shipping_note": issue or ship.get("note", ""),
+                "shipping_verified": issue is None,
                 "region": domain.region_of(address),
                 "status": "pending",
             }
+            if issue:
+                line["verify_issue"] = issue
+                if verify == "confirm_today":
+                    line["ship_date_override"] = today.isoformat()
+                elif verify == "confirm_next":
+                    line["ship_date_override"] = domain.next_shippable_day(today, blocked).isoformat()
+                else:
+                    line["status"] = "hold"
+                    if verify is None:
+                        questions.append(
+                            {
+                                "id": f"ship_verify:{line_id}", "type": "ship_unverified", "customer": customer,
+                                "title": f"{customer}님 주문 배송 검증 실패",
+                                "detail": f"{issue}. 원문의 받는 분·주소({o.get('address') or '없음'})·희망일({o.get('requested_when') or '없음'})을 직접 확인한 뒤에만 진행하세요. 확인 전까지 보류합니다.",
+                                "evidence": evidence(o.get("source_ids", [])),
+                                "options": [
+                                    {"value": "hold", "label": "보류(직접 확인 후 처리)", "recommended": True},
+                                    {"value": "confirm_today", "label": f"원문 확인함: 오늘 {domain.date_label(today)} 발송", "recommended": False},
+                                    {"value": "confirm_next", "label": f"원문 확인함: {domain.date_label(domain.next_shippable_day(today, blocked))} 발송", "recommended": False},
+                                ],
+                            }
+                        )
             if line["product"] not in catalog:
                 line["status"] = "hold"
                 notes.append({"customer": customer, "text": f"알 수 없는 상품 코드 {line['product']}"})
@@ -168,6 +229,8 @@ def compute_plan(job: dict, intake: dict, finance: dict, shipping: dict, answers
             elif override == "next":
                 line["ship_date_override"] = domain.next_shippable_day(today, blocked).isoformat()
             elif override == "hold":
+                line["status"] = "hold"
+            if issue and verify not in ("confirm_today", "confirm_next"):
                 line["status"] = "hold"
             lines.append(line)
         cancellations += [{"customer": customer, **c, "evidence": evidence(c.get("source_ids", []))} for c in res.get("cancelled", [])]
@@ -267,6 +330,8 @@ def compute_plan(job: dict, intake: dict, finance: dict, shipping: dict, answers
 
     for line in lines:
         line["status_label"] = domain.LINE_STATUS_LABEL.get(line["status"], line["status"])
+        if line.get("verify_issue") and line["status"] == "hold":
+            line["status_label"] = "보류 · 배송 검증 실패"
         line["amount"] = domain.line_amount(line, catalog, policy) if line["product"] in catalog else 0
         line["product_name"] = catalog.get(line["product"], {}).get("name", line["product"])
 
@@ -362,7 +427,7 @@ class Prepare(Executor):
         self.deps = deps
 
     @handler
-    async def run(self, job_in: dict, ctx: WorkflowContext[dict]) -> None:
+    async def run(self, job_in: dict, ctx: WorkflowContext[dict, dict]) -> None:
         run_id = job_in["run_id"]
         emit(run_id, kind="step", step="prepare", status="running", text="메시지·입금 문자 읽기, 전화번호 가명화")
         loaded = await self.deps.store.get_workspace(job_in["wsid"])
@@ -372,6 +437,23 @@ class Prepare(Executor):
         year = int(ws["business_date"][:4])
         messages = parse_kakao(job_in["inbox"], ws["farm"]["owner"], year)
         deposits = parse_deposits(job_in["deposits"], year)
+        # 이미 확정한 원천 메시지·입금은 다시 반영하지 않는다(새 실행으로 같은 자료를 넣어도 중복 없음).
+        processed = set(ws["ledger"].get("processed_sources", []))
+        msg_fps = source_fingerprints(messages, message_key)
+        dep_fps = source_fingerprints(deposits, deposit_key)
+        skipped_m = sum(1 for f in msg_fps if f in processed)
+        skipped_d = sum(1 for f in dep_fps if f in processed)
+        messages = [m for m, f in zip(messages, msg_fps) if f not in processed]
+        deposits = [d for d, f in zip(deposits, dep_fps) if f not in processed]
+        new_fps = [f for f in msg_fps + dep_fps if f not in processed]
+        if skipped_m or skipped_d:
+            emit(run_id, kind="step", step="prepare", status="running", text=f"이미 장부에 확정된 메시지 {skipped_m}건·입금 {skipped_d}건은 다시 반영하지 않음")
+        if not messages and not deposits:
+            emit(run_id, kind="step", step="prepare", status="done", text="새로 처리할 메시지·입금이 없습니다(모두 이미 확정됨)")
+            await ctx.yield_output({"status": "duplicate_input", "summary": {"skipped_messages": skipped_m, "skipped_deposits": skipped_d}})
+            return
+        if len({m["sender"] for m in messages}) > MAX_CUSTOMERS_PER_RUN:
+            raise ValueError(f"한 번에 처리할 수 있는 고객은 {MAX_CUSTOMERS_PER_RUN}명까지입니다. 자료를 나눠 실행해 주세요.")
         masker = PhoneMasker()
         for m in messages:
             m["text_masked"] = masker.mask(m["text"])
@@ -389,6 +471,7 @@ class Prepare(Executor):
             "phone_map": masker.mapping,
             "profiles_masked": profiles_masked,
             "first_message_at": first_at,
+            "source_fps": new_fps,
         }
         ctx.set_state("job", job)
         ctx.set_state("review_round", 0)
@@ -531,9 +614,9 @@ class Shipping(Executor):
             data = {l.line_id: l.model_dump() for l in out.lines}
             incomplete = sum(1 for v in data.values() if not v["address_complete"])
             emit(run_id, kind="agent", step="shipping", status="done", text=f"{len(data)}줄 확인, 주소 미완성 {incomplete}건")
-        except Exception:  # noqa: BLE001
-            data = {}
-            emit(run_id, kind="agent", step="shipping", status="failed", text="배송 에이전트 실패 — 주소 유무만으로 판단")
+        except Exception as exc:  # noqa: BLE001
+            data = {"_failed": str(exc)[:200]}
+            emit(run_id, kind="agent", step="shipping", status="failed", text="배송 에이전트 실패 — 해당 주문은 검증 실패로 보류, 사장님 확인 필요")
         ctx.set_state("shipping", data)
         await ctx.send_message({"from": "shipping"})
 
@@ -726,6 +809,7 @@ def build_committed_state(job: dict, plan: dict) -> tuple[dict, dict]:
         ledger["refunds"].append({**r, "run_id": run_id})
     ws["inventory"] = plan["inventory_after"]
     ledger["accounts"] = plan["payments"]
+    ledger["processed_sources"] = ledger.get("processed_sources", []) + job.get("source_fps", [])
     summary = {"run_id": run_id, "orders": len(plan["lines"]), "shipped_boxes": shipped, "refunds": sum(r["amount"] for r in plan["refunds"]), "payments": sum(1 for d in plan["deposits"] if d["confirmed"])}
     ledger["events"].append({"type": "morning_commit", **summary})
     return ws, summary
@@ -740,6 +824,10 @@ class Commit(Executor):
     async def run(self, _msg: dict, ctx: WorkflowContext[dict, dict]) -> None:
         job, plan = ctx.get_state("job"), ctx.get_state("plan")
         run_id = job["run_id"]
+        if run_id in CANCELLED:
+            await ctx.yield_output({"status": "cancelled"})
+            return
+        COMMITTING.add(run_id)
         emit(run_id, kind="step", step="commit", status="running", text="장부·재고 확정(트랜잭션)")
         state, summary = build_committed_state(job, plan)
         try:
@@ -748,6 +836,8 @@ class Commit(Executor):
             emit(run_id, kind="step", step="commit", status="failed", text="승인 전에 장부가 바뀌어 확정하지 않았습니다")
             await ctx.yield_output({"status": "conflict"})
             return
+        finally:
+            COMMITTING.discard(run_id)
         emit(run_id, kind="step", step="commit", status="done", text=f"확정 완료: 출고 {result.get('shipped_boxes', 0)}박스" + (" (이미 반영됨)" if status == "duplicate" else ""))
         await ctx.yield_output({"status": "committed" if status == "ok" else "duplicate", "summary": result})
 

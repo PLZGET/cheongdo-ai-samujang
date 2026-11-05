@@ -208,6 +208,8 @@ export function currentTask(ws: Workspace, run: Run | null): Task {
       return { title: "출고안을 반려했습니다", detail: "장부는 바뀌지 않았습니다. 자료를 고쳐 다시 처리할 수 있습니다.", view: "orders", action: "retry" };
     case "conflict":
       return { title: "승인 전에 장부가 바뀌어 확정하지 않았습니다", detail: "최신 장부로 다시 처리해 주세요.", view: "orders", action: "retry" };
+    case "cancelled":
+      return { title: "AI 처리를 취소했습니다", detail: "확정 전에 취소해 장부·재고는 바뀌지 않았습니다. 다시 처리할 수 있습니다.", view: "orders", action: "retry" };
     default:
       return { title: "처리 중 오류가 발생했습니다", detail: run.error ?? "입력을 확인한 뒤 다시 처리해 주세요. 장부는 바뀌지 않았습니다.", view: "orders", action: "retry" };
   }

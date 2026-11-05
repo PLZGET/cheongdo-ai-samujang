@@ -227,6 +227,18 @@ async def respond(wsid: str, run_id: str, body: RespondIn) -> dict:
     return public_run(run)
 
 
+@app.post("/api/workspaces/{wsid}/runs/{run_id}/cancel")
+async def cancel_run(wsid: str, run_id: str) -> dict:
+    await load_ws(wsid)
+    try:
+        run = await manager.cancel(wsid, run_id)
+    except KeyError as exc:
+        raise HTTPException(404, "실행 기록이 없습니다.") from exc
+    except RunBusy as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return public_run(run)
+
+
 def csv_response(rows: list[list], filename: str) -> Response:
     buf = io.StringIO()
     csv.writer(buf).writerows(rows)

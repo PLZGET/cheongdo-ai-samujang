@@ -84,6 +84,8 @@ export default function Orders({
   const inputCount = countInputs(inputs.inbox, inputs.deposits);
   const questionsTotal = run?.status === "waiting_questions" ? run.pending?.data.questions?.length ?? 0 : 0;
   const start = async () => {
+    const edited = inputs.inbox !== ws.state.samples.inbox || inputs.deposits !== ws.state.samples.deposits;
+    if (edited && !window.confirm("수정한 자료를 외부 AI 모델(GitHub Copilot)로 보냅니다. 전화번호만 토큰으로 바뀝니다. 이름·주소·주문 내용은 그대로 전송되고 자료는 7일간 보관됩니다. 계속할까요?")) return;
     setEditing(false);
     await morning.start(inputs.inbox, inputs.deposits);
   };
@@ -173,11 +175,12 @@ export default function Orders({
         {run && <RunStrip run={run} defaultOpen={run.status === "running"} />}
 
         {run && run.status === "completed" && <Completed run={run} wsid={ws.wsid} onNavigate={onNavigate} />}
-        {run && (run.status === "rejected" || run.status === "conflict" || run.status === "failed") && (
+        {run && (run.status === "rejected" || run.status === "conflict" || run.status === "failed" || run.status === "cancelled") && (
           <div className="note danger" role="alert">
             <XCircle size={16} aria-hidden />
             <span>
               {run.status === "rejected" && "출고안을 반려했습니다. 장부는 바뀌지 않았습니다."}
+              {run.status === "cancelled" && "확정 전에 AI 처리를 취소했습니다. 장부·재고는 바뀌지 않았습니다. (출고 확정 후에는 운영 정책상 고객 주문을 취소할 수 없습니다.)"}
               {run.status === "conflict" && "승인하기 전에 장부가 바뀌어 확정하지 않았습니다. 최신 장부로 다시 처리해 주세요."}
               {run.status === "failed" && `처리 중 오류가 발생했습니다. 장부는 바뀌지 않았습니다.${run.error ? ` (${run.error})` : ""}`}
             </span>
@@ -210,7 +213,7 @@ export default function Orders({
 
 function PrimaryAction({ morning, wsid, questions, onStart, onNavigate }: { morning: MorningRun; wsid: string; questions: number; onStart: () => void; onNavigate: (v: View) => void }) {
   const { run, active, starting, sending } = morning;
-  if (!run || run.status === "rejected" || run.status === "conflict" || run.status === "failed") {
+  if (!run || run.status === "rejected" || run.status === "conflict" || run.status === "failed" || run.status === "cancelled") {
     return (
       <button type="button" className="btn primary" onClick={onStart} disabled={starting || active}>
         {starting ? <Loader2 size={16} className="spin" aria-hidden /> : <Play size={16} aria-hidden />}
@@ -218,19 +221,30 @@ function PrimaryAction({ morning, wsid, questions, onStart, onNavigate }: { morn
       </button>
     );
   }
+  const cancelBtn = (
+    <button type="button" className="btn ghost" onClick={morning.cancel} disabled={!!sending} title="장부 확정 전 AI 처리만 멈춥니다. 장부·재고는 바뀌지 않습니다.">
+      {sending === "cancel" ? <Loader2 size={16} className="spin" aria-hidden /> : null} AI 처리 취소
+    </button>
+  );
   if (run.status === "running") {
     return (
-      <button type="button" className="btn primary" disabled>
-        <Loader2 size={16} className="spin" aria-hidden /> 처리 중
-      </button>
+      <>
+        {cancelBtn}
+        <button type="button" className="btn primary" disabled>
+          <Loader2 size={16} className="spin" aria-hidden /> 처리 중
+        </button>
+      </>
     );
   }
   if (run.status === "waiting_questions") {
     return (
-      <button type="button" className="btn primary" onClick={morning.submitAnswers} disabled={!!sending}>
+      <>
+        {cancelBtn}
+        <button type="button" className="btn primary" onClick={morning.submitAnswers} disabled={!!sending}>
         {sending === "answers" ? <Loader2 size={16} className="spin" aria-hidden /> : <Check size={16} aria-hidden />}
         답변 {questions}건 반영하고 다시 계산
       </button>
+      </>
     );
   }
   if (run.status === "waiting_approval") {
@@ -264,8 +278,9 @@ function Completed({ run, wsid, onNavigate }: { run: NonNullable<MorningRun["run
     <div className="note ok" role="status">
       <CheckCircle2 size={16} aria-hidden />
       <span>
-        <b>장부 확정 완료.</b> 주문 {s.orders}줄, 오늘 출고 {s.shipped_boxes}박스, 입금 연결 {s.payments}건{s.refunds ? `, 환불 예정 ${won(s.refunds)}` : ""}을 반영했습니다.
+        <b>장부 확정 완료.</b> 주문 {s.orders ?? 0}줄, 오늘 출고 {s.shipped_boxes ?? 0}박스, 입금 연결 {s.payments ?? 0}건{s.refunds ? `, 환불 예정 ${won(s.refunds)}` : ""}을 반영했습니다.
         {run.result?.status === "duplicate" && " 같은 승인이 다시 들어와 추가 반영 없이 기존 결과를 돌려주었습니다."}
+        {run.result?.status === "duplicate_input" && ` 이미 장부에 확정된 메시지 ${s.skipped_messages ?? 0}건·입금 ${s.skipped_deposits ?? 0}건이라 다시 반영하지 않았습니다.`}
       </span>
       <span className="note-actions">
         <a className="link" href={`/api/workspaces/${wsid}/exports/packing.csv`}>

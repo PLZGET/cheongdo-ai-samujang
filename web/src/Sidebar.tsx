@@ -101,12 +101,12 @@ export default function Sidebar({
 
       <div className="sb-foot">
         <p className="muted">
-          예제의 사람·주소·전화번호는 합성 데이터입니다. AI 제안은 승인 전까지 장부에 반영되지 않습니다.
+          예제의 사람·주소·전화번호는 합성 데이터입니다. AI 제안은 승인 전까지 장부에 반영되지 않습니다. 입력한 대화의 이름·주소·주문 내용은 외부 AI 모델(GitHub Copilot)로 전송되며 전화번호만 토큰으로 바꿔 보냅니다. 체험 자료는 마지막 변경 7일 뒤 자동 삭제됩니다.
         </p>
         <p className="muted num">버전 {ws.version.slice(0, 7)}</p>
         {confirming ? (
           <div className="sb-confirm" role="group" aria-label="체험 다시 시작 확인">
-            <span>지금 작업공간을 버리고 새 예제로 시작할까요?</span>
+            <span>새 작업공간에서 예제를 처음부터 시작할까요? 이 브라우저는 새 작업공간으로 옮겨 가며, 지금 작업공간은 삭제되지 않고 7일 보관 후 자동 삭제됩니다.</span>
             <div>
               <button
                 type="button"

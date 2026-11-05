@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, Loader2, Menu, X } from "lucide-react";
-import { api, Workspace } from "./api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowRight, Loader2, Menu, RefreshCw, X } from "lucide-react";
+import { api, ApiError, Workspace } from "./api";
 import { VIEWS, View } from "./model";
 import { useMorningRun } from "./useMorningRun";
 import Sidebar, { Mark } from "./Sidebar";
@@ -24,16 +24,28 @@ export default function App() {
   const [ws, setWs] = useState<Workspace | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const currentWsid = useRef(wsid);
+  currentWsid.current = wsid;
 
   const reload = useCallback(async () => {
     if (!wsid) return;
     try {
-      setWs(await api.workspace(wsid));
+      const fresh = await api.workspace(wsid);
+      if (currentWsid.current !== wsid) return;
+      setWs(fresh);
+      setLoadError(null);
     } catch (e) {
-      localStorage.removeItem(KEY);
-      setWsid(null);
-      setWs(null);
-      setError((e as Error).message);
+      if (currentWsid.current !== wsid) return;
+      if (e instanceof ApiError && e.status === 404) {
+        // 서버에 없는 작업공간일 때만 잊는다. 일시 오류는 기존 작업공간을 유지한다.
+        localStorage.removeItem(KEY);
+        setWsid(null);
+        setWs(null);
+        setError((e as Error).message);
+      } else {
+        setLoadError((e as Error).message);
+      }
     }
   }, [wsid]);
 
@@ -49,6 +61,7 @@ export default function App() {
       localStorage.setItem(KEY, id);
       window.location.hash = "#/today";
       setWs(null);
+      setLoadError(null);
       setWsid(id);
     } catch (e) {
       setError((e as Error).message);
@@ -58,8 +71,34 @@ export default function App() {
   };
 
   if (!wsid) return <Landing onStart={start} busy={busy} error={error} />;
-  if (!ws) return <Spinner label="작업공간을 불러오는 중" />;
-  return <Shell key={ws.wsid} ws={ws} reload={reload} onRestart={start} busy={busy} />;
+  if (!ws)
+    return loadError ? (
+      <div className="landing">
+        <main className="landing-main">
+          <p className="note danger" role="alert">
+            작업공간을 불러오지 못했습니다. 기존 작업공간은 그대로 있습니다. ({loadError})
+          </p>
+          <button type="button" className="btn primary" onClick={reload}>
+            <RefreshCw size={16} aria-hidden /> 다시 연결
+          </button>
+        </main>
+      </div>
+    ) : (
+      <Spinner label="작업공간을 불러오는 중" />
+    );
+  return (
+    <>
+      {loadError && (
+        <div className="note danger" role="alert" style={{ position: "fixed", bottom: 16, right: 16, zIndex: 50, maxWidth: 420 }}>
+          <span>최신 장부를 다시 읽지 못했습니다. 화면은 마지막으로 받은 내용입니다. ({loadError})</span>
+          <button type="button" className="btn ghost sm" onClick={reload}>
+            <RefreshCw size={14} aria-hidden /> 다시 읽기
+          </button>
+        </div>
+      )}
+      <Shell key={ws.wsid} ws={ws} reload={reload} onRestart={start} busy={busy} />
+    </>
+  );
 }
 
 function Shell({ ws, reload, onRestart, busy }: { ws: Workspace; reload: () => Promise<void>; onRestart: () => void; busy: boolean }) {

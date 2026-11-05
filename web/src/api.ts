@@ -27,6 +27,8 @@ export type Line = {
   status: string;
   status_label: string;
   ship_date?: string | null;
+  shipping_verified?: boolean;
+  verify_issue?: string;
   amount: number;
   region: string;
 };
@@ -95,8 +97,25 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...init });
+/** status 0: 응답을 받지 못한 통신 오류·시간 초과. 서버 작업은 계속됐을 수 있다. */
+export const isTransient = (e: unknown) => !(e instanceof ApiError) || e.status === 0 || e.status >= 500 || e.status === 429;
+
+async function request<T>(path: string, init?: RequestInit, timeoutMs = 20000): Promise<T> {
+  const ctrl = new AbortController();
+  const timer = window.setTimeout(() => ctrl.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...init, signal: ctrl.signal });
+  } catch {
+    throw new ApiError(
+      ctrl.signal.aborted
+        ? "서버 응답이 늦습니다. 화면의 요청만 멈춘 것이며 서버 작업은 계속될 수 있습니다. 잠시 후 다시 확인해 주세요."
+        : "서버에 연결하지 못했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.",
+      0,
+    );
+  } finally {
+    window.clearTimeout(timer);
+  }
   if (!res.ok) {
     let message = `요청 실패 (${res.status})`;
     try {
@@ -118,7 +137,8 @@ export const api = {
     request<Run>(`/api/workspaces/${wsid}/runs/morning`, { method: "POST", body: JSON.stringify({ inbox, deposits }) }),
   run: (wsid: string, runId: string) => request<Run>(`/api/workspaces/${wsid}/runs/${runId}`),
   respond: (wsid: string, runId: string, body: { request_id: string; answers?: Record<string, string>; decision?: string }) =>
-    request<Run>(`/api/workspaces/${wsid}/runs/${runId}/respond`, { method: "POST", body: JSON.stringify(body) }),
+    request<Run>(`/api/workspaces/${wsid}/runs/${runId}/respond`, { method: "POST", body: JSON.stringify(body) }, 30000),
+  cancel: (wsid: string, runId: string) => request<Run>(`/api/workspaces/${wsid}/runs/${runId}/cancel`, { method: "POST" }),
   evaluation: (wsid: string) => request<Evaluation>(`/api/workspaces/${wsid}/evaluation`),
   eventsUrl: (wsid: string, runId: string) => `/api/workspaces/${wsid}/runs/${runId}/events`,
 };
@@ -131,4 +151,4 @@ export type Evaluation = {
 };
 
 export const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
-export const TERMINAL = new Set(["completed", "rejected", "conflict", "failed"]);
+export const TERMINAL = new Set(["completed", "rejected", "conflict", "failed", "cancelled"]);

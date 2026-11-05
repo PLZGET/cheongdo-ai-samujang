@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -22,6 +23,16 @@ log = logging.getLogger("samujang.agents")
 MODEL_FAST = os.environ.get("MODEL_FAST", "claude-haiku-4.5")
 MODEL_REVIEW = os.environ.get("MODEL_REVIEW", "claude-sonnet-5")
 AGENT_TIMEOUT = float(os.environ.get("AGENT_TIMEOUT", "120"))
+# 인스턴스 전체의 동시 모델 호출 상한(여러 실행·작업자가 공유).
+MODEL_CONCURRENCY = int(os.environ.get("MODEL_CONCURRENCY", "4"))
+_model_slots: asyncio.Semaphore | None = None
+
+
+def model_slots() -> asyncio.Semaphore:
+    global _model_slots
+    if _model_slots is None:
+        _model_slots = asyncio.Semaphore(MODEL_CONCURRENCY)
+    return _model_slots
 
 COMMON_RULES = """
 공통 규칙:
@@ -323,7 +334,8 @@ async def run_structured(agent: GitHubCopilotAgent, prompt: Any, schema: type[T]
     last_error: Exception | None = None
     message = prompt
     for _ in range(attempts):
-        response = await agent.run(message, function_invocation_kwargs={"ws": ws_view})
+        async with model_slots():
+            response = await agent.run(message, function_invocation_kwargs={"ws": ws_view})
         try:
             return schema.model_validate(extract_json(response.text))
         except (ValueError, ValidationError) as exc:

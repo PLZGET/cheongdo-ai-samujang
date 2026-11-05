@@ -7,7 +7,7 @@ import logging
 import time
 from typing import Any
 
-from .morning import PROGRESS, WORKFLOW_NAME, Deps, build_workflow
+from .morning import CANCELLED, COMMITTING, PROGRESS, WORKFLOW_NAME, Deps, build_workflow
 from .store import StoreCheckpointStorage, jsonable, new_id
 
 log = logging.getLogger("samujang.runs")
@@ -35,6 +35,20 @@ class RunManager:
         if run_id in self.cache and self.cache[run_id]["wsid"] == wsid:
             return self.cache[run_id]
         doc = await self.deps.store.get_doc(wsid, f"run:{run_id}")
+        if doc and doc.get("status") in ACTIVE and run_id not in self.tasks:
+            # 서버 재시작으로 실행 주체가 사라진 작업. 확정 표식이 있으면 완료, 없으면 장부 미변경 중단으로 정리한다.
+            marker = await self.deps.store.get_doc(wsid, f"commit:{run_id}")
+            run = {k: v for k, v in doc.items() if not k.startswith("_") and k not in ("id", "kind")}
+            run["wsid"] = wsid
+            if marker:
+                run["status"], run["result"] = "completed", {"status": "committed", "summary": marker.get("result", {})}
+            else:
+                run["status"] = "failed"
+                run["error"] = "서버가 다시 시작되어 진행 중이던 AI 처리가 중단되었습니다. 장부는 바뀌지 않았습니다. 같은 자료로 다시 실행해 주세요."
+            run["pending"] = None
+            self._record(run, {"kind": "status", "status": run["status"], "text": run.get("error") or "재시작 전 확정 완료 확인"})
+            await self._save(run)
+            return run
         return doc
 
     async def _save(self, run: dict) -> None:
@@ -85,6 +99,27 @@ class RunManager:
             )
             return run
 
+    async def cancel(self, wsid: str, run_id: str) -> dict:
+        """확정 전 AI 처리 취소. 장부 확정이 시작된 뒤에는 취소하지 않는다."""
+        async with self._lock(run_id):
+            run = await self.get(wsid, run_id)
+            if run is None:
+                raise KeyError(run_id)
+            if run["status"] not in ACTIVE | WAITING:
+                return run
+            if run_id in COMMITTING:
+                raise RunBusy("이미 장부 확정이 시작되어 취소할 수 없습니다.")
+            CANCELLED.add(run_id)
+            task = self.tasks.pop(run_id, None)
+            if task and not task.done():
+                task.cancel()
+            run["status"] = "cancelled"
+            run["pending"] = None
+            self._record(run, {"kind": "status", "status": "cancelled", "text": "사장님이 AI 처리를 취소함 — 장부·재고 변경 없음"})
+            await self._save(run)
+            self._publish(run_id, {"type": "run", "run": run})
+            return run
+
     async def _drive(self, run: dict, message: dict | None = None, checkpoint_id: str | None = None, responses: dict | None = None) -> None:
         run_id, wsid = run["run_id"], run["wsid"]
         storage = StoreCheckpointStorage(self.deps.store, wsid, run_id)
@@ -111,7 +146,11 @@ class RunManager:
             failure = f"{type(exc).__name__}: {str(exc)[:400]}"
         finally:
             PROGRESS.pop(run_id, None)
+            if self.tasks.get(run_id) is asyncio.current_task():
+                self.tasks.pop(run_id, None)
 
+        if run_id in CANCELLED:
+            return
         if pending is not None:
             latest = await storage.get_latest(workflow_name=WORKFLOW_NAME)
             pending["checkpoint_id"] = latest.checkpoint_id if latest else None
@@ -121,7 +160,7 @@ class RunManager:
             run["plan"] = pending["data"].get("plan")
         elif output is not None:
             run["result"] = output
-            run["status"] = {"committed": "completed", "duplicate": "completed", "rejected": "rejected", "conflict": "conflict"}.get(output.get("status"), "completed")
+            run["status"] = {"committed": "completed", "duplicate": "completed", "duplicate_input": "completed", "rejected": "rejected", "conflict": "conflict", "cancelled": "cancelled"}.get(output.get("status"), "completed")
         else:
             run["status"] = "failed"
             run["error"] = failure or "워크플로가 결과 없이 종료되었습니다."
