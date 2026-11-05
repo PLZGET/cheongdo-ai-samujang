@@ -1,4 +1,4 @@
-# 인프라(Bicep) 배포 → ACR 원격 빌드 → 커밋 해시 태그 이미지로 Container App 갱신.
+# 인프라(Bicep) 배포 → 로컬 Docker 빌드·ACR 푸시 → 커밋 해시 태그 이미지로 Container App 갱신.
 param(
     [string]$ResourceGroup = "rg-cheongdo-hackathon-2026",
     [switch]$InfraOnly
@@ -37,7 +37,12 @@ $outputs = Invoke-Infra $current $currentVersion
 if ($InfraOnly) { $outputs | ConvertTo-Json -Depth 5; exit 0 }
 
 $acr = $outputs.acrName.value
-$tag = "samujang:$sha"
-az acr build -r $acr -t $tag --build-arg APP_VERSION=$sha . --only-show-errors
-$outputs = Invoke-Infra "$($outputs.acrLoginServer.value)/$tag" $sha
+$image = "$($outputs.acrLoginServer.value)/samujang:$sha"
+# 이 구독은 ACR Tasks(원격 빌드)를 허용하지 않아 로컬 Docker로 빌드·푸시한다.
+az acr login -n $acr --only-show-errors
+docker build --platform linux/amd64 --build-arg APP_VERSION=$sha -t $image .
+if ($LASTEXITCODE -ne 0) { throw "docker build 실패" }
+docker push $image
+if ($LASTEXITCODE -ne 0) { throw "docker push 실패" }
+$outputs = Invoke-Infra $image $sha
 Write-Host "배포 완료: $($outputs.appUrl.value) (버전 $sha)"
