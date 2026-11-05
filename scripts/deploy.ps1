@@ -128,13 +128,10 @@ if ($pushed -eq "true") {
         if ($b.Code -ne 0) { Stop-Deploy "이미지 빌드 (docker build)" (Tail ($b.Err + "`n" + $b.Out) 25) }
     }
 
-    # 4. ACR 로그인·푸시. az acr login 대신 액세스 토큰으로 docker login 해 실패 원인을 직접 보이게 한다.
+    # 4. ACR 로그인·푸시. 토큰을 docker login 에 직접 넘기면 거부되므로 az acr login 을 쓴다.
     Write-Host "[4/5] ACR 로그인·푸시 (최대 15분)"
-    $token = az acr login -n $acr.name --expose-token --query accessToken -o tsv --only-show-errors
-    if (-not $token) { Stop-Deploy "ACR 토큰 발급 (az acr login --expose-token)" "토큰을 받지 못했습니다. az login 상태를 확인하세요." }
-    $l = Invoke-Timed "docker" @("login", $acr.login, "-u", "00000000-0000-0000-0000-000000000000", "--password-stdin") 60 $token
-    Remove-Variable token
-    if ($l.Code -ne 0) { Stop-Deploy "ACR 로그인 (docker login)" (Tail ($l.Err + "`n" + $l.Out) 10) }
+    $loginOut = az acr login -n $acr.name --only-show-errors 2>&1 | Out-String
+    if ($LASTEXITCODE -ne 0) { Stop-Deploy "ACR 로그인 (az acr login)" (Tail $loginOut 10) }
     $p = Invoke-Timed "docker" @("push", $image) 900
     if ($p.Code -ne 0) { Stop-Deploy "이미지 푸시 (docker push)" (Tail ($p.Err + "`n" + $p.Out) 15) }
 }
