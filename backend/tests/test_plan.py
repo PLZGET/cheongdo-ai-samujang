@@ -63,6 +63,12 @@ def test_questions_before_answers():
     assert yoon["status"] == "wait_payment"
 
 
+def test_family_deposit_found_without_finance_agent():
+    plan = compute_plan(make_job(), INTAKE, {"matches": []}, SHIPPING, {})
+    q = next(q for q in plan["questions"] if q["type"] == "deposit_match")
+    assert q["customer"] == "박민수" and "배우자" in q["detail"]
+
+
 def test_plan_matches_answer_key():
     answers = {
         "last_year_repeat:박민수": "accept",

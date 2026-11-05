@@ -183,12 +183,20 @@ def compute_plan(job: dict, intake: dict, finance: dict, shipping: dict, answers
     matches = []
     for d in deposits:
         ai = ai_matches.get(d["id"])
+        if not (ai and ai["customer"] in totals):
+            ai = None
+            # 정산 에이전트가 놓친 경우에도 고객 기록의 가족 관계로 연결 후보를 만든다(확정은 사장님 확인 후).
+            for name, profile in ws["customers"].items():
+                rel = next((f["relation"] for f in profile.get("family", []) if f["name"] == d["payer"]), None)
+                if rel and name in totals:
+                    ai = {"customer": name, "reason": f"고객 기록상 {name}님의 {rel}", "by": "code"}
+                    break
         if d["payer"] in totals:
             matches.append({"deposit_id": d["id"], "customer": d["payer"], "confirmed": True, "by": "code", "reason": "입금자명과 주문자명 일치"})
-        elif ai and ai["customer"] in totals:
+        elif ai:
             qid = f"deposit_match:{d['id']}"
             ans = answers.get(qid)
-            matches.append({"deposit_id": d["id"], "customer": ai["customer"], "confirmed": ans == "link", "by": "ai", "reason": ai["reason"]})
+            matches.append({"deposit_id": d["id"], "customer": ai["customer"], "confirmed": ans == "link", "by": ai.get("by", "ai"), "reason": ai["reason"]})
             if ans is None:
                 questions.append(
                     {
