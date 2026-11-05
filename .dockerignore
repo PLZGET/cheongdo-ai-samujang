@@ -1,0 +1,16 @@
+.git
+.venv
+.github
+.playwright-mcp
+node_modules
+web/node_modules
+web/dist
+backend/tests
+**/__pycache__
+spikes
+docs
+scripts
+infra
+*.md
+.env
+.env.*
