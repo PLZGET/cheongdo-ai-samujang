@@ -1,0 +1,8 @@
+# Local design proposals and review evidence; the approved system and surface brief are versioned.
+mocks/
+review/
+questions/
+naver-options.json
+redesign-options.json
+b-direction.md
+config.local.json

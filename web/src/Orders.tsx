@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -16,10 +16,11 @@ import {
   ShieldAlert,
   XCircle,
 } from "lucide-react";
-import { Line, Plan, Question, Workspace, won } from "./api";
-import { Group, View, clock, countInputs, groupPlan, shortDate } from "./model";
+import { Plan, Question, Workspace, won } from "./api";
+import { Group, LINE_SHORT, PAY_TEXT, View, clock, countInputs, groupPlan, shortDate } from "./model";
 import { MorningRun } from "./useMorningRun";
-import { AiTag, EmptyState, ErrorNote, Evidence, LineChip, MessageList, Metric, PageHeader, PayChip, RichText, RunBadge, RunStrip, SearchBox, Segments } from "./ui";
+import { AiTag, EmptyState, ErrorNote, Evidence, LineChip, MessageList, PayChip, RichText, RunBadge, RunStrip, SearchBox, Segments } from "./ui";
+import "./orders.css";
 
 type Seg = "all" | "attention" | "today" | "waiting";
 export type Inputs = { inbox: string; deposits: string };
@@ -43,6 +44,8 @@ export default function Orders({
   const [selected, setSelected] = useState<string | null>(null);
   const [mobileDetail, setMobileDetail] = useState(false);
   const [editing, setEditing] = useState(false);
+  const detailHeading = useRef<HTMLHeadingElement>(null);
+  const selectedButton = useRef<HTMLButtonElement>(null);
 
   const groups = useMemo(() => (plan ? groupPlan(plan) : []), [plan]);
   const counts = useMemo(
@@ -66,21 +69,26 @@ export default function Orders({
     });
   }, [groups, seg, query]);
 
-  // 선택이 비었거나 목록에서 사라지면 확인이 필요한 고객부터 고른다.
+  // 검색·필터 결과 안에서 선택을 유지하고, 새 목록은 확인할 고객부터 연다.
   useEffect(() => {
-    if (!groups.length) {
+    if (!visible.length) {
       setSelected(null);
+      setMobileDetail(false);
       return;
     }
-    if (selected && groups.some((g) => g.customer === selected)) return;
-    setSelected((groups.find((g) => g.attention) ?? groups[0]).customer);
-  }, [groups, selected]);
+    if (selected && visible.some((g) => g.customer === selected)) return;
+    setSelected((visible.find((g) => g.attention) ?? visible[0]).customer);
+  }, [visible, selected]);
+
+  useEffect(() => {
+    if (mobileDetail && window.matchMedia("(max-width: 760px)").matches) detailHeading.current?.focus();
+  }, [mobileDetail, selected]);
 
   useEffect(() => {
     if (run && !active) setEditing(false);
   }, [run, active]);
 
-  const current = groups.find((g) => g.customer === selected) ?? null;
+  const current = visible.find((g) => g.customer === selected) ?? null;
   const inputCount = countInputs(inputs.inbox, inputs.deposits);
   const questionsTotal = run?.status === "waiting_questions" ? run.pending?.data.questions?.length ?? 0 : 0;
   const start = async () => {
@@ -107,35 +115,19 @@ export default function Orders({
   );
 
   return (
-    <div className="page orders">
-      <PageHeader
-        title="주문"
-        meta={meta}
-        tools={
-          plan && (
-            <>
-              <SearchBox value={query} onChange={setQuery} placeholder="고객·받는 분·주소·상품 검색" />
-              <Segments
-                label="주문 묶음 필터"
-                value={seg}
-                onChange={setSeg}
-                items={[
-                  { id: "all", label: "전체", count: counts.all },
-                  { id: "attention", label: "확인 필요", count: counts.attention },
-                  { id: "today", label: "오늘 출고", count: counts.today },
-                  { id: "waiting", label: "대기", count: counts.waiting },
-                ]}
-              />
-            </>
-          )
-        }
-      >
-        <PrimaryAction morning={morning} wsid={ws.wsid} questions={questionsTotal} onStart={start} onNavigate={onNavigate} />
-      </PageHeader>
+    <div className="page orders orders-b">
+      <header className="orders-b-header">
+        <div><h1>주문 작업함</h1><div className="orders-b-meta">{meta}</div></div>
+        <div className="orders-b-actions">
+          <PrimaryAction morning={morning} wsid={ws.wsid} questions={questionsTotal} onStart={start} onNavigate={onNavigate} />
+        </div>
+      </header>
 
       <div className="page-body">
         <ErrorNote message={morning.error} onDismiss={morning.dismissError} />
 
+        <details className="orders-b-context" key={`context-${run?.status ?? "idle"}`} open={!run || run.status === "running" || run.status === "waiting_approval"}>
+          <summary><b>자료·처리 현황</b><span>메시지 {inputCount.messages}건 · 입금 {inputCount.deposits}건</span><ChevronDown size={15} aria-hidden /></summary>
         <section className={editing ? "inputcard open" : "inputcard"} aria-label="입력 자료">
           <div className="inputcard-row">
             <Inbox size={16} aria-hidden className="muted" />
@@ -172,7 +164,18 @@ export default function Orders({
           )}
         </section>
 
-        {run && <RunStrip run={run} defaultOpen={run.status === "running"} />}
+        {run && (
+          <section className="orders-b-process" aria-label="처리 과정">
+            <RunStrip run={run} defaultOpen={run.status === "running"} />
+          </section>
+        )}
+        {plan && (
+          <section className="orders-b-overview" aria-label="출고안 요약">
+            <div className="orders-b-overview-label"><b>출고안 요약</b><span>오늘 출고 {plan.counts.ship_today_parcels}건 · {plan.counts.ship_today_boxes}박스</span></div>
+            <PlanSummary plan={plan} catalog={ws.state.catalog} done={run?.status === "completed"} />
+          </section>
+        )}
+        </details>
 
         {run && run.status === "completed" && <Completed run={run} wsid={ws.wsid} onNavigate={onNavigate} />}
         {run && (run.status === "rejected" || run.status === "conflict" || run.status === "failed" || run.status === "cancelled") && (
@@ -187,17 +190,31 @@ export default function Orders({
           </div>
         )}
 
-        {plan && <PlanSummary plan={plan} catalog={ws.state.catalog} done={run?.status === "completed"} />}
-
         {plan ? (
-          <div className={mobileDetail ? "split detail-open" : "split"}>
-            <OrderList groups={visible} selected={selected} onSelect={(c) => {
-              setSelected(c);
-              setMobileDetail(true);
-            }} total={groups.length} />
-            <div className="detail">
+          <div className={mobileDetail ? "orders-b-workspace detail-open" : "orders-b-workspace"}>
+            <aside className="orders-b-list-pane" aria-label="고객 작업 목록">
+              <div className="orders-b-list-tools">
+                <div className="orders-b-list-title"><h2>고객별 주문</h2><span className="num">{groups.length}</span></div>
+                <SearchBox value={query} onChange={setQuery} placeholder="고객·받는 분·주소·상품 검색" />
+                <Segments label="주문 묶음 필터" value={seg} onChange={setSeg} items={[
+                  { id: "all", label: "전체", count: counts.all },
+                  { id: "attention", label: "확인 필요", count: counts.attention },
+                  { id: "today", label: "오늘 출고", count: counts.today },
+                  { id: "waiting", label: "대기", count: counts.waiting },
+                ]} />
+              </div>
+              <p className="orders-b-list-count">{visible.length}명 표시{questionsTotal > 0 ? ` · 답변할 질문 ${questionsTotal}건` : ""}</p>
+              <OrderList groups={visible} selected={selected} selectedButton={selectedButton} onSelect={(c) => {
+                setSelected(c);
+                setMobileDetail(true);
+              }} total={groups.length} />
+            </aside>
+            <div className="orders-b-detail">
               {current ? (
-                <Detail group={current} plan={plan} morning={morning} onBack={() => setMobileDetail(false)} />
+                <Detail key={current.customer} group={current} plan={plan} morning={morning} headingRef={detailHeading} onBack={() => {
+                  setMobileDetail(false);
+                  requestAnimationFrame(() => selectedButton.current?.focus());
+                }} />
               ) : (
                 <EmptyState title="고객을 선택하세요" detail="왼쪽 목록에서 고객을 고르면 원문 메시지, 주문 줄, 입금, 배송 정보를 볼 수 있습니다." />
               )}
@@ -303,20 +320,12 @@ function PlanSummary({ plan, catalog, done }: { plan: Plan; catalog: Workspace["
   const products = Object.keys(plan.inventory_before);
   return (
     <>
-      <div className="metrics">
-        <Metric label="오늘 출고" value={`${plan.counts.ship_today_parcels}건 · ${plan.counts.ship_today_boxes}박스`} />
-        <Metric label="연결된 입금" value={`${confirmed.length}/${plan.deposits.length}건`} sub={won(confirmed.reduce((a, d) => a + d.amount, 0))} />
-        <Metric label="환불 예정" value={refund ? won(refund) : "없음"} tone={refund ? "warn" : undefined} />
-        <Metric
-          label={done ? "재고 변화" : "승인 후 재고"}
-          value={products.map((p) => (
-            <span key={p} className="inv">
-              {catalog[p]?.name ?? p} {plan.inventory_before[p].on_hand}→{plan.inventory_after[p].on_hand}
-            </span>
-          ))}
-          sub={plan.shortages.length ? <span className="bad">부족 {plan.shortages.map((s) => `${s.product_name} ${s.qty}박스`).join(", ")}</span> : "부족 없음"}
-        />
-      </div>
+      <dl className="orders-b-plan-facts">
+        <div><dt>오늘 출고</dt><dd className="num">{plan.counts.ship_today_parcels}건 · {plan.counts.ship_today_boxes}박스</dd></div>
+        <div><dt>연결된 입금</dt><dd className="num">{confirmed.length}/{plan.deposits.length}건 · {won(confirmed.reduce((a, d) => a + d.amount, 0))}</dd></div>
+        <div><dt>환불 예정</dt><dd className="num">{refund ? won(refund) : "없음"}</dd></div>
+        <div><dt>{done ? "재고 변화" : "승인 후 재고"}</dt><dd>{products.map((p) => <span key={p} className="num">{catalog[p]?.name ?? p} {plan.inventory_before[p].on_hand} → {plan.inventory_after[p].on_hand}</span>)}</dd></div>
+      </dl>
       {plan.shortages.map((s) => (
         <div key={s.product} className="note warn">
           <AlertTriangle size={16} aria-hidden />
@@ -329,75 +338,34 @@ function PlanSummary({ plan, catalog, done }: { plan: Plan; catalog: Workspace["
   );
 }
 
-function regionShort(line: Line) {
-  const a = line.address ?? line.address_raw ?? "";
-  const m = a.match(/^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)[^\s]*\s*([^\s]*)/);
-  if (!m) return a ? a.split(" ").slice(0, 2).join(" ") : "주소 없음";
-  return `${m[1]} ${m[2] ?? ""}`.trim();
-}
-
-function OrderList({ groups, selected, onSelect, total }: { groups: Group[]; selected: string | null; onSelect: (c: string) => void; total: number }) {
+function OrderList({ groups, selected, selectedButton, onSelect, total }: { groups: Group[]; selected: string | null; selectedButton: RefObject<HTMLButtonElement>; onSelect: (c: string) => void; total: number }) {
   if (!groups.length) {
     return (
-      <div className="list">
+      <div className="orders-b-empty-list">
         <EmptyState title={total ? "조건에 맞는 고객이 없습니다" : "정리된 주문이 없습니다"} detail={total ? "검색어나 필터를 바꿔 보세요." : undefined} />
       </div>
     );
   }
   return (
-    <ul className="list" aria-label="고객별 주문">
+    <ul className="orders-b-customer-list" aria-label="고객별 주문">
       {groups.map((g) => {
         const on = g.customer === selected;
+        const activeLines = g.lines.filter((l) => l.status !== "cancelled");
+        const summary = activeLines.length
+          ? activeLines.map((l) => `${l.product_name} ${l.qty}박스`).join(" · ")
+          : g.inquiries[0]?.text ?? g.questions[0]?.title ?? "주문 줄 없음";
+        const waitingLine = activeLines.find((l) => ["wait_address", "wait_confirm", "date_conflict", "short_stock", "hold"].includes(l.status));
+        const status = g.questions.length ? `질문 ${g.questions.length}`
+          : g.flags.length ? "지시문 감지"
+          : g.findings.some((f) => f.severity === "critical") ? "검토 필요"
+          : waitingLine ? LINE_SHORT[waitingLine.status] ?? waitingLine.status_label
+          : g.payment ? PAY_TEXT[g.payment.status] ?? g.payment.status
+          : activeLines[0] ? LINE_SHORT[activeLines[0].status] ?? activeLines[0].status_label : "문의";
         return (
           <li key={g.customer}>
-            <button type="button" className={on ? "card on" : "card"} aria-pressed={on} onClick={() => onSelect(g.customer)}>
-              <div className="card-head">
-                <b>{g.customer}</b>
-                {g.payment && g.payment.total > 0 && <PayChip status={g.payment.status} />}
-                {g.amount > 0 && <span className="num amount">{won(g.amount)}</span>}
-              </div>
-              {g.lines.length ? (
-                <ul className="card-lines">
-                  {g.lines.map((l) => (
-                    <li key={l.line_id} className={l.status === "cancelled" ? "cancelled" : undefined}>
-                      <span className="pl">
-                        {l.product_name} <b className="num">×{l.qty}</b>
-                      </span>
-                      <span className="rc muted">
-                        {l.recipient !== g.customer ? `${l.recipient} · ` : ""}
-                        {regionShort(l)}
-                      </span>
-                      <LineChip status={l.status} label={l.status_label} />
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="muted small card-note">{g.inquiries[0]?.text ?? g.questions[0]?.title ?? "주문 줄 없음"}</p>
-              )}
-              {(g.questions.length > 0 || g.flags.length > 0 || g.findings.length > 0 || g.inquiries.length > 0) && (
-                <div className="card-foot">
-                  {g.questions.length > 0 && (
-                    <span className="mark warn">
-                      <Bot size={11} aria-hidden /> 확인 질문 {g.questions.length}
-                    </span>
-                  )}
-                  {g.flags.length > 0 && (
-                    <span className="mark danger">
-                      <ShieldAlert size={11} aria-hidden /> 지시문 감지
-                    </span>
-                  )}
-                  {g.findings.length > 0 && (
-                    <span className="mark info">
-                      <Bot size={11} aria-hidden /> 검토 지적 {g.findings.length}
-                    </span>
-                  )}
-                  {g.inquiries.length > 0 && !g.lines.length && (
-                    <span className="mark muted">
-                      <MessageSquare size={11} aria-hidden /> 문의
-                    </span>
-                  )}
-                </div>
-              )}
+            <button ref={on ? selectedButton : undefined} type="button" className={on ? "orders-b-customer selected" : "orders-b-customer"} aria-pressed={on} aria-label={`${g.customer}, ${status}, ${summary}`} onClick={() => onSelect(g.customer)}>
+              <span className="orders-b-customer-top"><b>{g.questions.length > 0 && <i aria-hidden />}{g.customer}</b><span className={g.attention ? "orders-b-needs" : undefined}>{status}</span></span>
+              <span className="orders-b-customer-preview" title={summary}>{summary}</span>
             </button>
           </li>
         );
@@ -406,19 +374,21 @@ function OrderList({ groups, selected, onSelect, total }: { groups: Group[]; sel
   );
 }
 
-function Detail({ group: g, plan, morning, onBack }: { group: Group; plan: Plan; morning: MorningRun; onBack: () => void }) {
+function Detail({ group: g, plan, morning, headingRef, onBack }: { group: Group; plan: Plan; morning: MorningRun; headingRef: RefObject<HTMLHeadingElement>; onBack: () => void }) {
   const [copied, setCopied] = useState(false);
   const asking = morning.run?.status === "waiting_questions";
+  const needsAnswers = asking && g.questions.length > 0;
+  const activeLines = g.lines.filter((line) => line.status !== "cancelled");
   const pay = g.payment;
   const showPay = pay && (pay.total > 0 || pay.paid > 0);
   return (
     <article className="detail-inner" aria-label={`${g.customer} 상세`}>
       <header className="detail-head">
-        <button type="button" className="icon-btn back" onClick={onBack} aria-label="목록으로">
-          <ArrowLeft size={18} aria-hidden />
+        <button type="button" className="orders-b-back" onClick={onBack}>
+          <ArrowLeft size={18} aria-hidden /> 고객 목록
         </button>
         <div>
-          <h2>{g.customer}</h2>
+          <h2 ref={headingRef} tabIndex={-1}>{g.customer}</h2>
           <div className="detail-sub">
             {showPay && <PayChip status={pay.status} />}
             {showPay && (
@@ -431,15 +401,33 @@ function Detail({ group: g, plan, morning, onBack }: { group: Group; plan: Plan;
         </div>
       </header>
 
-      {asking && g.questions.length > 0 && (
-        <section className="dsec questions">
-          <h3>
-            <Bot size={14} aria-hidden className="ai-ico" /> 확인 질문 {g.questions.length}건
-          </h3>
-          {g.questions.map((q) => (
-            <QuestionCard key={q.id} q={q} value={morning.answers[q.id]} onChange={(v) => morning.setAnswer(q.id, v)} />
-          ))}
-        </section>
+      <section className="dsec orders-b-source">
+        <h3>주문 원문 <span className="muted small">{g.messages.length}건{g.evidenceCount > 0 ? ` · 근거 ${g.evidenceCount}건` : ""}</span></h3>
+        <MessageList messages={g.messages} evidence={g.evidenceIds} />
+      </section>
+
+      {needsAnswers && (
+        <>
+          {(activeLines.length > 0 || g.deposits.length > 0) && (
+            <div className="orders-b-quick-facts" aria-label="확인할 주문과 입금 요약">
+              {activeLines.length > 0 && <span>{activeLines.map((line) => `${line.product_name} ${line.qty}박스`).join(" · ")} <b className="num">{won(activeLines.reduce((sum, line) => sum + line.amount, 0))}</b></span>}
+              {g.deposits.length > 0 && <span>입금 내역 <b className="num">{won(g.deposits.reduce((sum, deposit) => sum + deposit.amount, 0))}</b>{g.deposits.some((deposit) => !deposit.confirmed) ? " · 연결 확인" : ""}</span>}
+            </div>
+          )}
+          <section className="dsec questions">
+            <h3>확인 질문 {g.questions.length}건</h3>
+            {g.questions.map((q) => (
+              <QuestionCard key={q.id} q={q} value={morning.answers[q.id]} disabled={!!morning.sending} onChange={(v) => morning.setAnswer(q.id, v)} />
+            ))}
+            <div className="orders-b-answer-action">
+              <p>다른 고객을 포함한 질문 {morning.run?.pending?.data.questions?.length ?? 0}건의 답변을 함께 반영합니다.</p>
+              <button type="button" className="btn primary" onClick={morning.submitAnswers} disabled={!!morning.sending}>
+                {morning.sending === "answers" && <Loader2 size={15} className="spin" aria-hidden />}
+                전체 답변 반영
+              </button>
+            </div>
+          </section>
+        </>
       )}
 
       {g.flags.map((f, i) => (
@@ -567,14 +555,6 @@ function Detail({ group: g, plan, morning, onBack }: { group: Group; plan: Plan;
         </section>
       )}
 
-      <section className="dsec">
-        <h3>
-          원문 메시지 {g.messages.length}
-          {g.evidenceCount > 0 && <span className="muted small"> · 근거로 쓰인 메시지 {g.evidenceCount}</span>}
-        </h3>
-        <MessageList messages={g.messages} evidence={g.evidenceIds} />
-      </section>
-
       {g.draft && (
         <section className="dsec draft">
           <h3>
@@ -609,15 +589,15 @@ function Detail({ group: g, plan, morning, onBack }: { group: Group; plan: Plan;
           </div>
         </section>
       )}
-      <p className="muted small detail-foot">{plan.review ? `검토 ${plan.review.round + 1}회차 기준` : ""}</p>
+      <p className="muted small detail-foot">{morning.run?.status === "completed" ? "장부에 반영된 주문입니다." : "최종 승인 전에는 장부와 재고에 반영되지 않습니다."}{plan.review ? ` · 검토 ${plan.review.round + 1}회차` : ""}</p>
     </article>
   );
 }
 
-function QuestionCard({ q, value, onChange }: { q: Question; value: string | undefined; onChange: (v: string) => void }) {
+function QuestionCard({ q, value, onChange, disabled }: { q: Question; value: string | undefined; onChange: (v: string) => void; disabled: boolean }) {
   const [more, setMore] = useState(false);
   return (
-    <fieldset className="question">
+    <fieldset className="question" disabled={disabled}>
       <legend>{q.title}</legend>
       <p>
         <RichText text={q.detail} />

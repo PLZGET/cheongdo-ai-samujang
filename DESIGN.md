@@ -1,12 +1,19 @@
 ---
 name: 청도 농가 AI 사무장
-description: 농가 주문·입금·출고를 정리하고 승인하는 업무 화면. 감색 한 가지 강조색, 따뜻한 중립 바탕, 밀도 있는 목록·상세 구조.
+description: 선명한 초록, 흰 작업면, 회색 탐색 영역과 얇은 구분선으로 정리한 농가 업무 도구.
 colors:
-  persimmon: "#d9621a"
-  persimmon-ink: "#a9480c"
-  persimmon-soft: "#fdeee3"
-  leaf: "#2f5d3a"
-  leaf-soft: "#e6f0e8"
+  brand: "#03c75a"
+  green: "#087f46"
+  green-hover: "#066b3b"
+  green-soft: "#eaf8ef"
+  surface-active: "#f1faf4"
+  bg: "#f5f6f8"
+  surface: "#ffffff"
+  surface-2: "#f7f8fa"
+  ink: "#202428"
+  muted: "#626973"
+  line: "#e5e7eb"
+  line-2: "#edf0f2"
   sky: "#2b4c7e"
   sky-soft: "#e4ecf5"
   warn: "#8a5300"
@@ -15,25 +22,28 @@ colors:
   danger-soft: "#fdeceb"
   ai: "#3c4f9a"
   ai-soft: "#eaeefb"
-  paper: "#f6f3ee"
-  sidebar: "#efeae1"
-  surface: "#ffffff"
-  surface-2: "#f9f6f1"
-  ink: "#1d221f"
-  ink-2: "#4b534e"
-  ink-3: "#697069"
-  line: "#e2dbcf"
-  line-2: "#ece7de"
 typography:
+  display:
+    fontFamily: "Pretendard Variable, Pretendard, system-ui, sans-serif"
+    fontSize: "clamp(2rem, 4.5vw, 3.5rem)"
+    fontWeight: 750
+    lineHeight: 1.3
+    letterSpacing: "-0.035em"
   headline:
     fontFamily: "Pretendard Variable, Pretendard, system-ui, sans-serif"
-    fontSize: "1.25rem"
+    fontSize: "24px"
     fontWeight: 700
+    lineHeight: 1.25
+    letterSpacing: "-0.02em"
+  customer-title:
+    fontFamily: "Pretendard Variable, Pretendard, system-ui, sans-serif"
+    fontSize: "24px"
+    fontWeight: 650
     lineHeight: 1.25
     letterSpacing: "-0.02em"
   title:
     fontFamily: "Pretendard Variable, Pretendard, system-ui, sans-serif"
-    fontSize: "0.9375rem"
+    fontSize: "16px"
     fontWeight: 700
     lineHeight: 1.25
     letterSpacing: "-0.02em"
@@ -44,16 +54,21 @@ typography:
     lineHeight: 1.5
   data:
     fontFamily: "Pretendard Variable, Pretendard, system-ui, sans-serif"
-    fontSize: "0.875rem"
+    fontSize: "14px"
     fontWeight: 400
     lineHeight: 1.5
-    fontFeature: "tnum"
+  meta:
+    fontFamily: "Pretendard Variable, Pretendard, system-ui, sans-serif"
+    fontSize: "13px"
+    fontWeight: 400
+    lineHeight: 1.5
   label:
     fontFamily: "Pretendard Variable, Pretendard, system-ui, sans-serif"
     fontSize: "0.75rem"
     fontWeight: 700
     lineHeight: 1.5
 rounded:
+  compact: "5px"
   sm: "6px"
   md: "8px"
   lg: "12px"
@@ -61,159 +76,193 @@ rounded:
 spacing:
   xs: "4px"
   sm: "8px"
+  compact: "12px"
   md: "16px"
+  section: "20px"
   lg: "24px"
+  pane: "28px"
+  xl: "32px"
 components:
   button-primary:
-    backgroundColor: "{colors.persimmon-ink}"
+    backgroundColor: "{colors.green}"
     textColor: "{colors.surface}"
-    rounded: "{rounded.md}"
-    padding: "8px 14px"
+    rounded: "{rounded.sm}"
+    padding: "0.5rem 0.9rem"
   button-primary-hover:
-    backgroundColor: "#8f3c09"
-    textColor: "{colors.surface}"
+    backgroundColor: "{colors.green-hover}"
   button-ghost:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.ink}"
-    rounded: "{rounded.md}"
-    padding: "8px 14px"
+    rounded: "{rounded.sm}"
+    padding: "0.5rem 0.9rem"
+  button-danger:
+    backgroundColor: "{colors.danger}"
+    textColor: "{colors.surface}"
+    rounded: "{rounded.sm}"
+    padding: "0.5rem 0.9rem"
+  order-button:
+    rounded: "{rounded.compact}"
+  search:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.compact}"
+    padding: "5px 9px"
+  sidebar-item-active:
+    backgroundColor: "{colors.green-soft}"
+    textColor: "{colors.green}"
+    rounded: "{rounded.sm}"
+    padding: "12px 10px"
   chip:
     typography: "{typography.label}"
     rounded: "{rounded.sm}"
-    padding: "2px 8px"
-  card:
+    padding: "0.1rem 0.5rem"
+  section-panel:
     backgroundColor: "{colors.surface}"
     rounded: "{rounded.lg}"
-    padding: "14px 18px"
-  card-selected:
-    backgroundColor: "#fffbf7"
-    rounded: "{rounded.lg}"
-  input:
-    backgroundColor: "{colors.surface-2}"
+    padding: "22px 24px"
+  customer-row:
+    backgroundColor: "{colors.surface}"
     textColor: "{colors.ink}"
-    rounded: "{rounded.md}"
-    padding: "10px 11px"
-  sidebar-item-active:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.persimmon-ink}"
-    rounded: "{rounded.md}"
-    padding: "8px 10px"
+    padding: "13px 18px"
+  customer-row-selected:
+    backgroundColor: "{colors.green-soft}"
+  message:
+    backgroundColor: "{colors.bg}"
+    rounded: "{rounded.compact}"
+    padding: "12px 14px"
 ---
 
 # Design System: 청도 농가 AI 사무장
 
 ## Overview
 
-사장님이 아침마다 여는 사무 도구다. 꾸밈보다 밀도와 일관성을 택하고, 익숙한 업무용 문법(사이드바 · 목록 · 상세 · 상태 칩)을 그대로 쓴다. 브랜드는 감(persimmon) 하나의 강조색과 따뜻한 종이색 중립층, 담백한 존댓말 문장에 산다. AI가 만든 모든 결과는 `AI 제안` 표시와 근거 메시지를 함께 보여 주고, 승인 전에는 아무것도 바뀌지 않는다는 사실이 화면 곳곳에 드러난다.
+**Creative North Star: "주문 작업함"**
 
-- 모드: Operate. 랜딩 한 화면만 Persuade이며 거기서도 과장하지 않는다.
-- 안티 레퍼런스: 큰 입력창 두 개가 화면을 차지하는 폼, 카드 안의 카드, 장식용 그라데이션·글래스.
+고객과 처리 상태를 빠르게 읽는 흰 작업면을 중심으로 한다. 회색 탐색 영역, 얇은 구분선, 또렷한 한글을 사용하고, 선명한 초록은 제품 마크와 선택 표시를 맡는다. 행동과 링크에는 더 짙은 초록을 쓴다.
+
+사용자가 선택한 B 방향을 실제 구현에서 추출했다. 기존 감색·크림색 농가 테마와 설명이 화면을 차지하는 구성은 교체했다. 네이버 서비스의 익숙한 탐색 감각을 참고하되 제품명과 자체 감 모양 마크를 유지한다.
+
+**Key Characteristics:**
+
+- 흰 작업면과 회색 탐색 영역을 얇은 선으로 구분한다.
+- 초록의 밝기 차이로 제품 정체성과 실행 행동을 구별한다.
+- 카드 장식보다 고객 행, 근거 메시지, 질문의 읽기 순서를 우선한다.
+- 작은 화면에서도 고객 목록과 상세 사이의 이동·포커스를 유지한다.
+
+추출 기준은 `web/src/styles.css`, `workspace.css`, `orders.css`의 최종 적용값과 `App.tsx`, `Sidebar.tsx`, `Orders.tsx`다. 화면별 방향 계약은 `.impeccable/surfaces/web-src-app-tsx.md`에 둔다.
 
 ## Colors
 
-### Primary
-- **감(persimmon)** `#d9621a` — 마크와 선택 테두리. 텍스트에는 쓰지 않는다.
-- **감 잉크(persimmon-ink)** `#a9480c` — 주 행동 버튼, 현재 메뉴, 링크. 흰 글자 대비 5.9:1.
-- **감 연함(persimmon-soft)** `#fdeee3` — 선택된 옵션 배경, `예제 농가` 태그, 포커스 링 바깥.
+차가운 회색 중립층에 초록을 더하고 업무 상태에는 의미가 정해진 보조색을 쓴다. 값은 위 토큰을 기준으로 한다.
 
-### Secondary (상태 어휘)
-- **잎(leaf / leaf-soft)** — 완료·연결·오늘 출고.
-- **하늘(sky / sky-soft)** — 출고 예약(오늘이 아닌 발송일).
-- **주의(warn / warn-soft)** — 입금·주소·확인 대기, 사람 차례(질문·승인 대기).
-- **위험(danger / danger-soft)** — 재고 부족, 보류, 미입금, 지시문 감지, 실패.
-- **AI(ai / ai-soft)** — AI 제안·AI 해석·AI 작성 표시, 처리 중 상태. 사람·코드와 구분하는 유일한 용도.
+### Primary
+
+- **브랜드 초록 · brand:** 자체 마크, 질문이 있는 고객의 점, 현재 주문 필터의 밑줄.
+- **행동 초록 · green / green-hover:** 주 행동, 링크, 현재 메뉴 글자, 포커스와 라디오 선택.
+- **선택 연초록 · green-soft:** 현재 메뉴·고객 행, 완료·입금 완료·오늘 출고 표시.
+- **작업 연초록 · surface-active:** 대기 작업 영역과 상세 전환 시작 배경.
+
+### Secondary
+
+- **예약 파랑 · sky / sky-soft:** 오늘 이후 출고 예약.
+- **확인 황갈색 · warn / warn-soft:** 입금·주소·확인 대기, 사장님 질문·승인 차례.
+- **오류 빨강 · danger / danger-soft:** 보류·재고 부족·미입금·실패와 확인 단계의 다시 시작 버튼.
+- **AI 남색 · ai / ai-soft:** 처리 중, AI 표시, 초과 입금. 주문 상세의 작은 AI 출처 표시는 보조 글자색으로 낮춘다.
 
 ### Neutral
-- **종이(paper)** `#f6f3ee` 본문 바탕 → **사이드바** `#efeae1` 한 단계 어두운 중립층 → **surface** 흰색 카드 → **surface-2** `#f9f6f1` 카드 안 채움(원문 말풍선, 입력창).
-- 글자 3단: ink / ink-2(보조) / ink-3(라벨·메타). 모두 흰 바탕에서 4.5:1 이상.
-- 선 2단: line(카드·구분) / line-2(표 행).
 
-### Named Rules
-- 강조색은 주 행동·현재 선택·상태 표시에만 쓴다. 장식에 쓰지 않는다.
-- 같은 뜻은 같은 색: 주문 줄 칩, 결제 칩, 실행 배지, 사이드바 배지가 위 표를 공유한다.
-- 비활성 요소에 채도 높은 색을 올리지 않는다(`opacity .55`).
+- **작업 배경 · bg:** 앱 배경·사이드바, 주문 상세의 메시지·근거·안내 초안 채움.
+- **작업면 · surface / 보조 채움 · surface-2:** 흰 패널과 일반 입력·로그·호버 상태.
+- **본문 · ink / 보조 · muted:** 제목·본문과 메타데이터의 두 단계. 기존 `ink-2`, `ink-3`는 같은 보조색이다.
+- **구분선 · line / line-2:** 패널 경계와 내부 행 경계.
+
+**The 초록 역할 분리 Rule.** 밝은 브랜드 초록은 작은 식별 표시에 쓰고, 실행 버튼과 읽어야 하는 초록 글자는 행동 초록을 쓴다.
 
 ## Typography
 
-Pretendard Variable 한 가족. 고정 rem 스케일(유동 아님), 단계 비율 약 1.125.
+Pretendard Variable을 로컬 패키지에서 불러오고 Pretendard, system-ui, sans-serif로 대체한다. 하나의 글꼴 안에서 크기·굵기·행간으로 위계를 만든다.
 
-### Hierarchy
-- **headline** 1.25rem / 700 — 화면 제목(주문, 입금…). 화면당 하나.
-- **title** 0.9375rem / 700 — 구역 제목, 상세 고객명은 1.0625rem.
-- **body** 0.9375rem — 본문. 표·목록·상세는 **data** 0.875rem, 메타·보조는 0.8125rem.
-- **label** 0.75rem / 700 — 칩, 배지, 표 머리글, 메트릭 라벨.
-- 숫자는 전부 `tabular-nums`(`.num`).
+- **Display:** 시작 화면 제목만 사용하는 유동 크기다.
+- **Headline / Customer title:** 화면 제목과 선택한 고객명. 고객명은 한 단계 가벼운 굵기다.
+- **Title:** 일반 구역 제목. 주문 목록 제목은 18px / 650, 상세 구역 제목은 데스크톱 14px, 모바일 15px다.
+- **Body / Data:** 기본 본문과 표·작업 데이터. 원문 메시지는 데스크톱 14px / 1.65, 모바일 15px다.
+- **Meta / Label:** 설명·시각·건수와 상태 칩. 고객 행은 이름 15px / 650, 미리보기 13px이며 모바일에서 각각 16px, 14px다.
 
-### Named Rules
-- 자간은 제목만 -0.02em. 본문·데이터는 기본.
-- 기능 이름은 제품 용어를 그대로: 아침 업무, 주문 줄, 입금 대조, 출고안, 승인하고 장부 확정, 확인 질문, 근거.
-- 버튼은 행동을 이름으로 쓴다(`답변 4건 반영하고 다시 계산`, `승인하고 장부 확정`). 오류는 문제와 복구를 함께 쓴다.
+**The 숫자 정렬 Rule.** 금액·수량·날짜의 숫자에는 `tabular-nums`를 적용한다. 제목 자간은 좁히고 본문은 기본 간격을 유지한다.
 
 ## Layout
 
-- 데스크톱: `232px` 사이드바 + 본문. 본문은 `page-head`(제목·메타·검색·필터·주 행동) 고정, `page-body`가 스크롤.
-- 주문 화면: `minmax(0,1fr) | minmax(360px,420px)` 목록·상세 2열. 상세는 `position: sticky` 로 따라오고 자체 스크롤.
-- 1100px 이하: 상세 360px로 축소. 960px 이하: 사이드바 → 상단바 + 드로어, 2열 → 1열, 상세는 전체 화면 레이어(뒤로 버튼). 주 행동 버튼은 전체 폭.
-- 간격: 카드 사이 8~14px, 구역 사이 14px, 카드 안 14/18px. 제목 위 여백 > 아래 여백.
-- 표 행 높이 약 40px, 짧은 셀은 줄바꿈 금지(`white-space: nowrap`), 사유·주소만 `.wrap`.
+- 앱 셸은 상단바(64px), 사이드바(184px), 남은 너비의 본문으로 구성한다. 본문은 제목 영역 아래에서 스크롤한다.
+- 주문 작업함은 고객 목록(300px)과 가변 상세를 맞붙인다. 고객 행은 최소 74px, 상세 내부는 좌우 32px다.
+- 자료·처리 현황은 최소 40px의 접기 행이다. 실행 전·처리 중·승인 대기에는 펼치고, 질문 대기에는 접어 원문과 질문을 앞에 둔다.
+- 일반 업무 화면은 본문 좌우 30px, 구역 간격 20px, 패널 내부 22px 24px다. 주문 목록의 연속 행과는 구별한다.
+- 1100px 이하에서 주문 헤더 행동을 줄바꿈하고 상세 내부 간격을 23px로 줄인다.
+- 960px 이하에서 사이드바를 드로어로 바꾸고 상단바를 60px로 줄인다. 드로어는 280px, 최대 화면 너비의 85%다.
+- 760px 이하에서 주문 목록과 상세를 하나씩 보여 준다. 고객 선택 시 상세 제목에 포커스를 주고, 목록으로 돌아오면 선택 행에 복원한다. 상세 좌우 간격은 20px다.
+- 모바일 검색·자료 입력 글자는 16px, 고객 행은 최소 78px다. 답변 반영 버튼은 전체 폭, 최소 44px다.
 
 ## Elevation & Depth
 
-평면 + 1px 선. 그림자는 드로어와 선택 상태의 안쪽 테두리 정도로만 쓴다.
+평면을 기본으로 흰 작업면·회색 채움·1px 선을 조합한다. 주문 작업함의 목록·상세에는 그림자를 쓰지 않는다. 일반 구역 패널은 둥근 모서리와 선으로 구분한다.
 
-### Named Rules
-- 카드는 `1px solid line` 하나로 구분한다. 선과 그림자를 함께 올리지 않는다.
-- 선택된 카드는 `border-color: persimmon` + `inset 0 0 0 1px persimmon` + 배경 `#fffbf7`.
-- 카드 안에 카드를 넣지 않는다. 상세 안 주문 줄·입금은 구분선으로 나눈다.
+- **드로어:** `--shadow`의 낮은 확산 그림자를 열린 모바일 메뉴에 적용한다.
+- **입력 포커스:** 연초록 3px 링과 행동 초록 경계선.
+- **선택 표시:** 일반 필터의 작은 음영, 주문 필터의 2px 안쪽 밑줄.
+
+**The 평면 작업면 Rule.** 목록·상세의 위계는 여백과 구분선으로 만들고, 그림자는 입력·선택 상태와 화면 위에 뜨는 메뉴에 한정한다.
 
 ## Shapes
 
-- 컨트롤(버튼·입력·칩) 6~8px, 카드·패널 12px, 말풍선 10px, 사이드바 배지·태그만 pill.
-- 아이콘은 lucide 한 벌, 선 굵기 기본. 이모지·유니코드 기호를 아이콘 대신 쓰지 않는다.
+주문 화면의 버튼·검색·메시지는 `compact`, 공통 버튼·메뉴·칩은 `sm`, 일반 구역 패널은 `lg` 모서리를 쓴다. 고객 행과 상세 구역은 직각으로 이어지고 질문은 테두리 카드 없이 네이티브 라디오로 표시한다. pill은 작은 태그·배지·진행 단계에 쓰며 아바타는 원형이다.
+
+아이콘은 lucide-react의 선 아이콘이다. 자체 감 실루엣 SVG 마크를 두 초록으로 채운다.
 
 ## Components
 
 ### Buttons
-- `btn primary`: 감 잉크 배경, 흰 글자, 화면당 하나의 주 행동. 상태에 따라 라벨이 바뀐다(처리 → 답변 반영 → 승인 → CSV).
-- `btn ghost`: 흰 배경 + line 테두리. 보조 행동(반려, 새로고침, 자료 편집).
-- `btn danger`: 되돌릴 수 없는 확인(체험 다시 시작)에서만.
-- `link`: 인라인 보조 행동, AI 색. `icon-btn`: 닫기·메뉴.
-- 모든 버튼: hover 배경 변화, `:active` 1px 내려앉음, `:disabled` 0.55 투명, 로딩 시 Loader2 스피너.
+
+행동 초록 주 버튼, 흰색·얇은 선 보조 버튼, 빨간 확인 버튼으로 구별한다. 공통 버튼은 최소 38px이며 주문 화면은 작은 모서리와 13px 글자를 쓴다. 모바일 주문 헤더 버튼은 최소 42px다.
+
+호버는 배경·경계색이 150ms로 바뀐다. 눌림은 1px 내려가고 비활성은 불투명도 0.55다. 키보드 포커스는 행동 초록 2px 선이며 주문 화면은 바깥 간격 3px를 둔다. 처리 중은 버튼 안 스피너와 행동 문구로 표시한다.
 
 ### Chips
-- 주문 줄 `chip st-*`, 결제 `chip pay-*`, 실행 `chip run-*`, 사이드바 `sb-badge`, 작은 표시 `mark`. 모두 0.72~0.75rem / 700, 6px 라운드.
-- 목록에서는 짧은 라벨(`입금 대기`), 상세에서는 백엔드 전체 라벨(`입금 대기(재고 확보)`).
+
+상태 칩은 작은 둥근 모서리와 굵은 라벨을 공유한다. 주문·결제·실행 상태는 텍스트와 의미색을 함께 제공하고 취소에는 취소선을 더한다. 사이드바 배지는 더 작은 pill이다.
 
 ### Cards / Containers
-- `card`(목록의 고객 묶음): 이름 · 결제 칩 · 금액 / 주문 줄들(상품×수량 · 받는 분·지역 · 상태 칩) / 확인 질문·지시문·검토 표시.
-- `sec`: 흰 카드 + `sec-head`(제목 + 보조 문구/액션).
-- `note ok|warn|danger|info`: 아이콘 + 문장. 왼쪽 두꺼운 색 테두리를 쓰지 않는다.
-- `metric`: 작은 라벨 + 굵은 값 + 보조. 과장된 큰 숫자 금지.
-- `empty`: 점선 테두리, 제목 + 다음 행동 버튼.
+
+일반 흰 구역 패널은 얇은 선과 큰 모서리를 쓴다. 주문 작업함에서는 연속 고객 행과 상세 구분선이 컨테이너다. 원문·근거·안내 초안은 회색 채움으로 구분한다. 빈 상태에는 제목과 다음 행동을 둔다.
 
 ### Inputs / Fields
-- `search`: 돋보기 + 입력 + 지우기. 포커스 시 감 테두리 + 연한 링.
-- `segments`: 눌림 버튼 묶음(`aria-pressed`), 선택 항목 흰 배경, 건수 pill.
-- `textarea`: surface-2 배경, 감 캐럿, 실행 중 비활성. 기본은 접힌 `inputcard` 안에 숨긴다.
-- `option`(확인 질문 선택지): 라디오 + 라벨 + `추천` 태그. 선택 시 감 테두리.
+
+검색은 돋보기·입력·지우기로 구성한다. 주문 필터는 텍스트 탭이며 현재 항목 아래 브랜드 초록 선을 표시한다. 자료 편집은 접힌 영역에서 열고 처리 중 비활성화한다. 질문은 설명·근거 토글·라디오 선택지·추천 표시를 묶는다.
 
 ### Navigation
-- 사이드바: 마크·제품명 / 농가 카드(`예제 농가`) / 그룹 라벨(업무·기록) / 항목(아이콘 + 라벨 + 상태 배지) / 하단 검증 문구·버전·체험 다시 시작(2단 확인).
-- 현재 항목은 흰 배경 + 감 잉크 글자. 호버는 5% 잉크.
 
-### RunStrip (고유 컴포넌트)
-- 에이전트 팀 11단계를 한 줄 pill로 보여 준다. 상태 아이콘(대기 전·처리 중·대기·완료·실패) + 짧은 이름, 호버로 전체 이름과 AI/코드/사람 구분.
-- 오른쪽에 실행 배지와 `로그 N` 토글. 처리 중에는 로그가 열리고, 사람 차례가 되면 자동으로 접힌다.
+회색 사이드바에 아이콘·메뉴명·배지를 정렬한다. 현재 메뉴는 연초록 배경과 행동 초록 글자다. 모바일 드로어는 Escape로 닫고 포커스를 내부에 유지하며, 닫으면 메뉴 버튼에 복원한다. 본문 바로가기는 포커스를 받으면 나타난다.
 
-### 원문 메시지 (msg)
-- surface-2 말풍선, 보낸 사람·시각 메타. 근거로 쓰인 메시지는 연한 감 배경 + `근거` 표시.
-- 가명화 토큰 `[전화N]`은 `전화번호` 칩으로, `mN` 참조는 `HH:MM 메시지`로 바꿔 보여 준다.
+### 고객 작업 행과 상세
+
+행에는 고객명, 질문·입금 상태, 주문 요약을 넣는다. 선택 배경과 상세 고객명이 함께 바뀐다. 질문이 있는 고객은 원문 → 주문·입금 요약 → 확인 질문 → 주문 줄·입금 내역 순서다. 답변 반영은 다른 고객의 질문도 함께 처리한다는 문구를 버튼 옆에 둔다.
+
+고객 전환은 220ms 동안 연초록에서 흰 배경으로 바뀐다. 모션 감소 설정에서는 상세 애니메이션을 끄고 일반 전환 시간을 최소화하며 처리 스피너는 3초 주기로 늦춘다.
+
+### 처리 현황
+
+진행 단계·실행 배지·로그 토글을 자료·처리 현황 안에 묶는다. 모바일 단계 목록은 4열이다. 보조 정보를 접어도 실행 상태와 다음 행동은 헤더에서 확인할 수 있다.
 
 ## Do's and Don'ts
 
-- Do: 상태마다 주 행동 버튼은 하나만, 헤더 오른쪽에.
-- Do: AI가 만든 줄에는 `AI 제안/해석/작성` 태그와 근거를 붙인다.
-- Do: 장부에 반영되지 않았다는 사실을 승인 전 화면마다 한 줄로 말한다.
-- Don't: 없는 기능(송장 회신, 일일 마감, 클레임, 장부 대화)을 메뉴나 버튼으로 보이게 하지 않는다.
-- Don't: 제목 위 작은 소제목(eyebrow), 그라데이션 글자, 카드 안의 카드, 장식용 모션.
-- Don't: 스피너를 콘텐츠 한가운데 두지 않는다. 처리 중에는 단계 스트립과 원문이 보인다.
+### Do:
+
+- **Do** 행동 초록과 브랜드 초록의 역할을 구분한다.
+- **Do** 고객 선택, 상태 문구, 키보드 포커스가 같은 작업 맥락을 가리키게 한다.
+- **Do** AI 출처와 근거, 승인 전 장부·재고 미반영 문구를 읽을 수 있게 둔다.
+- **Do** 예제 농가와 합성 자료 표시를 실제 사용자 정보와 구분한다.
+
+### Don't:
+
+- **Don't** 이전 감색·크림색 농가 테마를 다시 섞는다.
+- **Don't** 네이버 로고나 공식 서비스라는 표현을 사용한다.
+- **Don't** 목록·상세를 장식 카드로 잘게 나누거나 큰 설명 블록으로 작업을 밀어낸다.
+- **Don't** 없는 기능을 메뉴·버튼으로 제시하거나 색만으로 상태를 전달한다.
